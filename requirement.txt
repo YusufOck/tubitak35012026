@@ -1,0 +1,8 @@
+# Core math and signal processing
+numpy>=1.24.0
+
+# Hardware interface for E22 LoRa module (UART)
+pyserial>=3.5
+
+# RTL-SDR Python wrapper
+pyrtlsdr>=0.2.9
