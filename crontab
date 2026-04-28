@@ -1,1 +1,0 @@
-@reboot /bin/bash -c 'sleep 15; cd /home/furkan/Desktop/tubitak35012026 && source /home/drone_2venv/bin/activate && python /home/furkan/Desktop/tubitak35012026/sendd_signal_deneme_2.py >> /home/furkan/Desktop/tubitak35012026/sendd_signal.log 2>&1' &
