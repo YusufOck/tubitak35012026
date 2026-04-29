@@ -4,6 +4,8 @@ import serial.tools.list_ports
 import time
 import sys
 from rtlsdr import RtlSdr
+import os
+import grp
 
 # --- MİMARİ YAPILANDIRMA ---
 NODE_ID = 4  # Her drone için bu ID'yi (1, 2, 3 veya 4) değiştirin
@@ -23,26 +25,37 @@ class AeroGuardianNode:
         self.connect_lora() # Otomatik port bulma ve bağlanma
 
     def connect_lora(self):
-        """LoRa modülünün bağlı olduğu USB portunu otomatik bulur ve bağlanır."""
+        """'dialout' grubuna ait olan seri portları otomatik bulur ve bağlanır."""
         while self.lora is None or not self.lora.is_open:
             ports = list(serial.tools.list_ports.comports())
             target_port = None
             
             for p in ports:
-                # "USB" kelimesi geçen portları arar (ttyUSB0, ttyACM0 vb.)
-                if "USB" in p.device or "Serial" in p.description:
-                    target_port = p.device
-                    break
+                device_path = p.device
+                # Sadece mantıklı seri port isimlerini filtrele (Gereksiz cihazları atla)
+                if "ttyUSB" in device_path or "ttyS" in device_path or "ttyAMA" in device_path:
+                    try:
+                        # Cihaz yolunun (örn: /dev/ttyS0) sistem bilgilerini al
+                        stat_info = os.stat(device_path)
+                        # Dosyanın grup ID'sini alıp adını bul (örn: 'dialout' mu?)
+                        group_name = grp.getgrgid(stat_info.st_gid).gr_name
+                        
+                        if group_name == 'dialout':
+                            target_port = device_path
+                            break # dialout grubunda bir port bulduk, aramayı durdur
+                    except Exception as e:
+                        # İzin hatası vb. olursa bu portu atla
+                        continue
             
             if target_port:
                 try:
                     self.lora = serial.Serial(target_port, LORA_BAUD, timeout=0.1)
-                    print(f"[SYSTEM] Node {self.node_id} basariyla {target_port} portuna baglandi.")
+                    print(f"[SYSTEM] Node {self.node_id} basariyla {target_port} (dialout) portuna baglandi.")
                 except Exception as e:
-                    print(f"[ERROR] Porta baglanilamadi: {e}. 2 saniye sonra tekrar denenecek...")
+                    print(f"[ERROR] Porta baglanilamadi ({target_port}): {e}. 2 saniye sonra tekrar denenecek...")
                     time.sleep(2)
             else:
-                print("[WARNING] Bekleniyor... Hicbir USB Serial cihaz bulunamadi. Lutfen baglantiyi kontrol edin.")
+                print("[WARNING] Bekleniyor... 'dialout' grubuna ait uygun bir port bulunamadi.")
                 time.sleep(2)
 
     def configure_sdr(self):
