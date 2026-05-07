@@ -45,10 +45,42 @@ class LocalizationNode:
             self.shutdown(None, None)
 
     def _find_lora_port(self):
-        """Dynamically finds the USB adapter so Linux port swapping doesn't crash the drone."""
-        for port in serial.tools.list_ports.comports():
-            if "USB" in port.device.upper() or "SERIAL" in port.description.upper():
-                return port.device
+        """
+        Finds possible LoRa serial ports robustly.
+        Tries ttyUSB*, ttyACM*, and USB-Serial adapters.
+        """
+        candidates = []
+
+        ports = list(serial.tools.list_ports.comports())
+
+        for port in ports:
+            device = port.device
+            description = port.description.upper()
+            hwid = port.hwid.upper()
+
+            logging.info(f"Detected serial candidate: {device} | {description} | {hwid}")
+
+            if (
+                "USB" in device.upper()
+                or "TTYUSB" in device.upper()
+                or "TTYACM" in device.upper()
+                or "USB" in description
+                or "SERIAL" in description
+                or "CH340" in description
+                or "CP210" in description
+                or "FTDI" in description
+            ):
+                candidates.append(device)
+
+        for device in candidates:
+            try:
+                test_serial = serial.Serial(device, LORA_BAUD, timeout=0.2)
+                test_serial.close()
+                logging.info(f"LoRa serial port selected: {device}")
+                return device
+            except Exception as e:
+                logging.warning(f"Port rejected: {device} | {e}")
+
         return None
 
     def _configure_sdr(self):
